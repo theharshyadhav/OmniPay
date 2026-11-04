@@ -106,3 +106,8 @@ web/ (vanilla JS)  ->  app/server.py (WSGI, sessions, step-up, rate limits, Open
 Key invariants (all tested): Decimal money stored as exact integer atoms; double entry enforced by DB triggers (an unbalanced transaction cannot be sealed);
 user/hold/escrow balances can never go negative; one payment per quote (idempotent); holds with compensation; **unknown outcomes stay on hold until reconciled**;
 the PayPal credit is computed from PayPal's own capture record fetched server-to-server, never from client or webhook-body amounts; webhooks are signature-verified and deduplicated.
+
+## Licence
+OmniPay is released under the MIT License (see LICENSE).
+Bundled third-party files keep their own licences: Inter font (SIL Open Font License),
+TeX Gyre Adventor font (GUST Font License, web/fonts/), jsQR (Apache 2.0, web/vendor/).
