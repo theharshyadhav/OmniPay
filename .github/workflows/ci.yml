@@ -1,0 +1,37 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: pip install -r requirements-dev.txt
+      - run: python -m unittest discover -s . -p 'test_*.py' -t .        # reference engine tests
+      - run: python -m unittest discover -s tests -t .                    # platform tests
+      - run: python -m evals.run                                          # 35 scripted agent conversations (offline)
+      - name: UI smoke test (real server + headless DOM shim)
+        run: |
+          OMNIPAY_DEMO=1 OMNIPAY_DB=/tmp/ci.db PORT=8123 OMNIPAY_JOBS=0 python -m app.serve &
+          for i in $(seq 1 60); do curl -sf localhost:8123/healthz && break; sleep 0.5; done
+          node tests/ui_smoke.js
+          npm i --no-save playwright@1.48.2 && npx playwright install --with-deps chromium
+          node tests/ui_browser.js screenshots                                # real Chromium, desktop + phone
+          node tests/qr_check.js /tmp && pip install opencv-python-headless && python tests/qr_check.py /tmp
+          node tests/scan_parse.js
+      - name: QR scanning in Chromium with a fake camera (https server)
+        run: |
+          OMNIPAY_DEMO=1 OMNIPAY_HTTPS=1 OMNIPAY_CERT_DIR=/tmp/cert OMNIPAY_DB=/tmp/ci2.db PORT=8443 OMNIPAY_JOBS=0 python -m app.serve &
+          for i in $(seq 1 60); do curl -skf https://localhost:8443/healthz && break; sleep 0.5; done
+          python tests/make_fake_camera.py /tmp/cam.y4m 'upi://pay?pa=ravi@omni&pn=Ravi%27s%20Chai%20Stall&am=250&cu=INR&tn=Masala%20chai%20x5'
+          python tests/make_fake_camera.py /tmp/blank.y4m --blank
+          python -c "import cv2; q=cv2.QRCodeEncoder.create().encode('https://x/#/pay?to=dana%40omni'); q=cv2.resize(q,None,fx=12,fy=12,interpolation=cv2.INTER_NEAREST); cv2.imwrite('/tmp/qr.png', cv2.copyMakeBorder(q,80,80,80,80,cv2.BORDER_CONSTANT,value=255))"
+          BASE=https://127.0.0.1:8443 NODE_TLS_REJECT_UNAUTHORIZED=0 node tests/ui_scan.js /tmp/cam.y4m /tmp/blank.y4m /tmp/qr.png screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: screenshots, path: screenshots }
+      - run: bandit -q -r app            # SAST (first run in CI: expect to triage findings)
+      - run: pip-audit -r requirements.txt

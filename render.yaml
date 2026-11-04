@@ -1,0 +1,15 @@
+# Example managed-host blueprint (Render). Not deployed from here. Single instance + persistent disk because of SQLite.
+services:
+  - type: web
+    name: omnipay
+    runtime: docker
+    plan: starter
+    healthCheckPath: /healthz
+    disk: { name: data, mountPath: /data, sizeGB: 5 }
+    envVars:
+      - { key: OMNIPAY_DEMO, value: "1" }
+      - { key: PAYPAL_ENV, value: sandbox }
+      - { key: PAYPAL_CLIENT_ID, sync: false }
+      - { key: PAYPAL_SECRET, sync: false }
+      - { key: PAYPAL_WEBHOOK_ID, sync: false }
+      - { key: GROQ_API_KEY, sync: false }

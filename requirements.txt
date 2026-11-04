@@ -1,0 +1,2 @@
+# The application itself is standard-library only. gunicorn is the production WSGI server used by the Dockerfile.
+gunicorn==23.0.*

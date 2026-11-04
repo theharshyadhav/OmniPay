@@ -1,0 +1,4 @@
+-r requirements.txt
+bandit
+pip-audit
+# Not used yet (would be needed by the not-yet-written Postgres adapter): psycopg[binary]

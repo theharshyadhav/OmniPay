@@ -1,0 +1,14 @@
+services:
+  app:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env            # copy .env.example to .env; never commit it
+    volumes: ["omnipay-data:/data"]
+    restart: unless-stopped
+  # Postgres is the intended production database. The application currently runs on SQLite (single instance, persistent
+  # volume); migrations/postgres/0001_init.sql is written but the adapter is NOT implemented. Do not rely on this service yet.
+  # db:
+  #   image: postgres:16
+  #   environment: { POSTGRES_PASSWORD: change-me }
+volumes:
+  omnipay-data:

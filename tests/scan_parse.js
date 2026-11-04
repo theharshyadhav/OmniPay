@@ -1,0 +1,23 @@
+// Unit tests for web/scan.js (what a scanned QR code turns into). Run: node tests/scan_parse.js
+const { parse, payRoute } = require('../web/scan.js');
+let bad = 0; const eq = (got, want, m) => { const g = JSON.stringify(got), w = JSON.stringify(want); if (g !== w) { bad++; console.error('FAIL', m, '\n  got ', g, '\n  want', w); } else console.log('ok  ', m); };
+const O = { origin: 'https://omnipay.example' };
+eq(parse('https://omnipay.example/#/pay?to=dana@omni', O), { kind: 'omnipay', to: 'dana@omni', foreign: false, host: 'omnipay.example' }, 'own pay link');
+eq(parse('https://omnipay.example/#/pay?to=Dana@Omni&amount=12.50&currency=eur', O).currency, 'EUR', 'currency upper-cased');
+eq(parse('https://other.example/#/pay?invoice=inv-abc123def0', O), { kind: 'omnipay', invoice: 'inv-abc123def0', foreign: true, host: 'other.example' }, 'request link from another host is flagged');
+eq(parse('upi://pay?pa=ravi@omni&pn=Ravi%27s%20Chai%20Stall&am=250&cu=INR&tn=Masala%20chai'), { kind: 'upi', to: 'ravi@omni', name: "Ravi's Chai Stall", amount: '250', currency: 'INR', note: 'Masala chai' }, 'UPI merchant code');
+eq(parse('UPI://PAY?PA=shop@okicici&AM=99').currency, 'INR', 'UPI keys are case-insensitive, currency defaults to INR');
+eq(parse('upi://pay?pn=Nobody').kind, 'unknown', 'UPI code without payee is rejected');
+eq(parse('omnipay:bob@omni'), { kind: 'omnipay', to: 'bob@omni' }, 'omnipay: scheme');
+eq(parse('omnipay://pay?to=bob@omni&amount=5'), { kind: 'omnipay', to: 'bob@omni', amount: '5' }, 'omnipay://pay');
+eq(parse('dana@omni'), { kind: 'omnipay', to: 'dana@omni' }, 'bare handle');
+eq(parse('inv-demo000001'), { kind: 'omnipay', invoice: 'inv-demo000001' }, 'bare request id');
+eq(parse('https://evil.example/login').kind, 'unknown', 'ordinary links are never treated as payments');
+eq(parse('javascript:alert(1)').kind, 'unknown', 'script URLs are unknown');
+eq(parse('https://omnipay.example/#/pay?to=<script>&amount=-5', O).kind, 'unknown', 'bad handle and negative amount are dropped');
+eq(parse('https://omnipay.example/#/pay?to=dana@omni&amount=1e9', O).amount, undefined, 'exponent amounts are dropped');
+eq(parse('upi://pay?pa=a@b&tn=' + encodeURIComponent('x\u0000y'.repeat(100))).note.length <= 140, true, 'notes are cleaned and capped');
+eq(parse('   '), { kind: 'empty' }, 'empty');
+eq(payRoute({ to: 'ravi@omni', amount: '250', currency: 'INR', note: 'chai' }, { via: 'upi' }), 'pay?to=ravi%40omni&amount=250&currency=INR&note=chai&via=upi', 'route for a parsed code');
+eq(payRoute({ invoice: 'inv-abc123def0', to: 'x@y' }), 'pay?invoice=inv-abc123def0', 'requests route by id only');
+console.log(bad ? `\n${bad} FAILED` : '\nscan parser tests passed'); process.exit(bad ? 1 : 0);
